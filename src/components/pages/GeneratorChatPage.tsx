@@ -1150,64 +1150,126 @@ function GeneratorChatPageInternal() {
       </div>
 
       {/* Right Column: Preview & Controls */}
-      <div className="w-full md:w-3/5 lg:w-2/3 flex flex-col p-2 sm:p-4 md:p-6 bg-[#23243A] h-full overflow-y-auto relative">
+      <div className="w-full md:w-3/5 lg:w-2/3 flex flex-col bg-[#23243A] h-full overflow-y-auto relative">
         <div className="absolute inset-0 pointer-events-none" style={{
           background: 'linear-gradient(90deg, var(--brand-gradient-from), var(--brand-gradient-via), var(--brand-gradient-to))',
           opacity: 0.1,
           zIndex: 0
         }} />
         <div className="relative z-10">
-          <div className="flex items-center justify-end mb-4">
-            <div className="text-right">
-              <p className="text-xs text-white/60">Content Title:</p>
-              <h1 className="text-xl font-extrabold bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] bg-clip-text text-transparent truncate max-w-xs sm:max-w-md md:max-w-lg" title={title}>{title}</h1>
-            </div>
+          {/* Black Header */}
+          <div className="absolute top-0 left-0 right-0 h-[70px] bg-black/95 backdrop-blur-md z-30" />
+          <div className="absolute top-0 left-0 right-0 h-[70px] z-20 before:content-[''] before:absolute before:inset-0 before:border-[0.1px] before:border-transparent before:bg-gradient-to-r before:from-[var(--brand-gradient-from)] before:via-[var(--brand-gradient-via)] before:to-[var(--brand-gradient-to)] before:bg-clip-border before:rounded-none" />
+          <div className="h-[70px] relative z-40 flex items-center justify-end px-4">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-10 w-10 rounded-full bg-black/40 hover:bg-black/60 border border-white/10 hover:border-white/20 transition-all duration-200 relative before:content-[''] before:absolute before:inset-0 before:rounded-full before:border-[0.1px] before:border-transparent before:bg-gradient-to-r before:from-[var(--brand-gradient-from)] before:via-[var(--brand-gradient-via)] before:to-[var(--brand-gradient-to)] before:bg-clip-border before:z-[-1]"
+            >
+              <User className="h-5 w-5 text-white/90" />
+            </Button>
           </div>
-          <div className="flex-grow grid grid-cols-1 sm:grid-cols-2 gap-4 items-center justify-center">
-            {thumbnailUrls.map((url, index) => (
-              <Card key={index} className="aspect-[16/9] relative group/thumb overflow-hidden rounded-2xl border border-black bg-black flex items-center justify-center transition-all duration-300 hover:scale-[1.03] cursor-pointer p-0 group hover:border-2 hover:border-transparent hover:bg-black hover:bg-clip-padding hover:[background-origin:border-box] hover:[position:relative]">
-                <span className="pointer-events-none absolute inset-0 rounded-2xl z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" style={{
-                  border: '2px solid transparent',
-                  background: 'linear-gradient(90deg, #FF9900, #FF3366, #8B5CF6) border-box',
-                  WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                  WebkitMaskComposite: 'xor',
-                  maskComposite: 'exclude',
-                }} />
-                {isProcessing && currentStep === "generating" && !url && (
-                  <div className="flex flex-col items-center text-muted-foreground">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
-                    <span className="text-xs">Generating {index + 1}...</span>
+          <div className="h-[1px] w-full bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] opacity-50" />
+
+          <div className="p-4">
+            <div className="text-right mb-6">
+              <p className="text-xs text-white/60">Title:</p>
+              <h1 className="text-right text-xl font-extrabold bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] bg-clip-text text-transparent truncate ml-auto max-w-xs sm:max-w-md md:max-w-lg" title={title}>{title}</h1>
+            </div>
+
+            <div className="flex-grow grid grid-cols-1 sm:grid-cols-2 gap-6 items-center justify-center">
+              {thumbnailUrls.map((url, index) => (
+                <Card key={index} className="aspect-[16/9] relative group/thumb overflow-hidden rounded-2xl border border-black/20 bg-black/40 backdrop-blur-sm flex items-center justify-center transition-all duration-300 hover:scale-[1.02] cursor-pointer p-0 group hover:border-2 hover:border-transparent hover:bg-black/40 hover:bg-clip-padding hover:[background-origin:border-box] hover:[position:relative]">
+                  <span className="pointer-events-none absolute inset-0 rounded-2xl z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" style={{
+                    border: '2px solid transparent',
+                    background: 'linear-gradient(90deg, var(--brand-gradient-from), var(--brand-gradient-via), var(--brand-gradient-to)) border-box',
+                    WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                    WebkitMaskComposite: 'xor',
+                    maskComposite: 'exclude',
+                  }} />
+                  
+                  {/* Loading State */}
+                  {isProcessing && currentStep === "generating" && !url && (
+                    <div className="flex flex-col items-center text-white/70">
+                      <div className="relative">
+                        <Loader2 className="h-8 w-8 animate-spin text-[var(--brand-gradient-to)] mb-2" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-xs font-medium">{index + 1}</span>
+                        </div>
+                      </div>
+                      <span className="text-xs font-medium">Generating...</span>
+                    </div>
+                  )}
+
+                  {/* Empty State */}
+                  {!isProcessing && !url && !generationError && (
+                    <div className="flex flex-col items-center text-white/40">
+                      <ImageIcon className="h-12 w-12 mb-2" />
+                      <span className="text-xs font-medium">Thumbnail {index + 1}</span>
+                    </div>
+                  )}
+
+                  {/* Image Preview */}
+                  {url && !url.startsWith("data:image/svg+xml") && ( 
+                    <div className="relative w-full h-full">
+                      <Image 
+                        src={url} 
+                        alt={`Generated thumbnail ${index + 1}`} 
+                        layout="fill" 
+                        objectFit="contain" 
+                        className="transition-transform duration-300 group-hover/thumb:scale-105" 
+                        data-ai-hint="generated image"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover/thumb:opacity-100 transition-opacity duration-200" />
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  {url && !url.startsWith("data:image/svg+xml") && (
+                    <div className="absolute top-2 right-2 opacity-0 group-hover/thumb:opacity-100 transition-opacity duration-200 z-20">
+                      <Button 
+                        onClick={() => handleDownload(url, index)} 
+                        size="icon" 
+                        variant="ghost" 
+                        className="h-8 w-8 bg-black/40 hover:bg-black/60 text-white"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Thumbnail Number */}
+                  <div className="absolute top-2 left-2 px-2 py-1 rounded-md bg-black/40 text-white/70 text-xs font-medium opacity-0 group-hover/thumb:opacity-100 transition-opacity duration-200 z-20">
+                    Thumbnail {index + 1}
                   </div>
-                )}
-                {!isProcessing && !url && !generationError && (
-                  <ImageIcon className="h-12 w-12 text-muted-foreground/30" data-ai-hint="placeholder image" />
-                )}
-                {url && !url.startsWith("data:image/svg+xml") && ( 
-                  <Image src={url} alt={`Generated thumbnail ${index + 1}`} layout="fill" objectFit="contain" className="transition-transform duration-300 group-hover/thumb:scale-105" data-ai-hint="generated image" />
-                )}
-                {url && !url.startsWith("data:image/svg+xml") && (
-                  <Button onClick={() => handleDownload(url, index)} size="icon" variant="ghost" className="absolute top-1.5 right-1.5 bg-black/40 hover:bg-black/60 text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity h-7 w-7 z-10">
-                    <Download className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-              </Card>
-            ))}
+                </Card>
+              ))}
+            </div>
+
+            {generationError && (
+              <div className="mt-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="h-5 w-5" />
+                  <strong>Generation Error</strong>
+                </div>
+                <p className="text-sm">{generationError}</p>
+              </div>
+            )}
+
+            {(currentStep === "results" || generationError) && !isProcessing && (
+              <div className="mt-6 flex justify-end">
+                <Button 
+                  onClick={handleRegenerate} 
+                  variant="outline" 
+                  size="lg" 
+                  disabled={isProcessing}
+                  className="bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] text-white border-transparent hover:opacity-90"
+                >
+                  <RefreshCw className="mr-2 h-5 w-5" /> Regenerate All Thumbnails
+                </Button>
+              </div>
+            )}
           </div>
-
-          {generationError && (
-            <div className="mt-4 p-3 bg-destructive/10 border border-destructive/30 rounded-md text-destructive text-sm">
-              <AlertTriangle className="h-5 w-5 inline mr-2" />
-              <strong>Generation Error:</strong> {generationError}
-            </div>
-          )}
-
-          {(currentStep === "results" || generationError) && !isProcessing && (
-            <div className="mt-6 flex justify-end">
-              <Button onClick={handleRegenerate} variant="outline" size="lg" disabled={isProcessing}>
-                <RefreshCw className="mr-2 h-5 w-5" /> Regenerate Thumbnails
-              </Button>
-            </div>
-          )}
         </div>
       </div>
 
