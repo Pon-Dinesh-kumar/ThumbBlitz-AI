@@ -10,8 +10,13 @@ import { AppLogo } from "@/components/icons/AppLogo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { searchYouTubeVideos, YouTubeVideo, getMockYouTubeVideos, fetchUploadsPlaylistVideos } from "@/services/youtube";
-import { ArrowRight, Paperclip, Globe, Eye, Users, Star, ChevronRight, Loader2 } from "lucide-react";
+import { ArrowRight, Paperclip, Globe, Eye, Users, Star, ChevronRight, Loader2, User, PaletteIcon, Send, Sparkles, Wand2, CheckCircle } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
   title: z.string().min(3, { message: "Title must be at least 3 characters." }).max(100, { message: "Title can be at most 100 characters." }),
@@ -46,6 +51,20 @@ const PLACEHOLDER_TITLES = [
   "Live Music Performance",
   "Travel Guide: Japan",
   "Fitness Challenge: 30 Days"
+];
+
+const PREDEFINED_COLORS = [
+  { name: "Black", value: "#000000" },
+  { name: "Dark Gray", value: "#1A1A1A" },
+  { name: "Gray", value: "#333333" },
+  { name: "Light Gray", value: "#4A4A4A" },
+  { name: "White", value: "#FFFFFF" },
+  { name: "Gradient 1", value: "linear-gradient(90deg, #FF9900, #FF3366)" },
+  { name: "Gradient 2", value: "linear-gradient(90deg, #FF3366, #8B5CF6)" },
+  { name: "Gradient 3", value: "linear-gradient(90deg, #8B5CF6, #FF9900)" },
+  { name: "Gradient 4", value: "linear-gradient(90deg, #FF9900, #8B5CF6)" },
+  { name: "Gradient 5", value: "linear-gradient(90deg, #FF3366, #FF9900)" },
+  { name: "Gradient 6", value: "linear-gradient(90deg, #8B5CF6, #FF3366)" },
 ];
 
 export default function LandingPage() {
@@ -241,7 +260,6 @@ export default function LandingPage() {
                 </button>
               ))}
             </div>
-            <Button variant="ghost" className="flex items-center gap-1 text-sm font-semibold bg-clip-text text-transparent bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] border-none shadow-none hover:bg-gradient-to-r hover:from-[var(--brand-gradient-from)] hover:via-[var(--brand-gradient-via)] hover:to-[var(--brand-gradient-to)] hover:text-white">View All <ChevronRight className="h-4 w-4" /></Button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {/* Your Thumbnails */}

@@ -554,13 +554,13 @@ function GeneratorChatPageInternal() {
 
   const handleUpdateInspirationLevel = (videoId: string, newLevel: number) => {
     setSelectedInspirations(prev =>
-      prev.map(insp => insp.id === videoId ? { ...insp, level: newLevel } : insp)
+      prev.map(inspiration => inspiration.id === videoId ? { ...inspiration, level: newLevel } : inspiration)
     );
   };
 
   const handleUpdateInspirationToggles = (videoId: string, toggleName: 'useSameFace' | 'useSameText', value: boolean) => {
     setSelectedInspirations(prev =>
-      prev.map(insp => insp.id === videoId ? { ...insp, [toggleName]: value } : insp)
+      prev.map(inspiration => inspiration.id === videoId ? { ...inspiration, [toggleName]: value } : inspiration)
     );
   };
   
@@ -616,44 +616,80 @@ function GeneratorChatPageInternal() {
     switch (currentStep) {
       case "primaryColors":
         return (
-          <div className="mt-2 p-3 bg-card rounded-lg shadow">
+          <div className="mt-2 p-3 bg-card/80 backdrop-blur-sm rounded-lg shadow-lg border border-white/5 transition-all duration-300 hover:border-white/10">
             <Label className="text-sm font-medium text-foreground/90 flex items-center gap-2 mb-2">
               <PaletteIcon className="h-4 w-4 text-primary/80" /> Select Primary Colors (Up to {MAX_PRIMARY_COLORS})
             </Label>
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-x-2 gap-y-2">
               {PREDEFINED_COLORS.map(color => (
-                <div key={color} className="flex items-center space-x-1.5">
+                <div key={color} className="flex items-center space-x-1.5 group">
                   <Checkbox
                     id={`chat-color-${color}`}
                     checked={primaryColors.includes(color)}
                     onCheckedChange={() => {
-                        setPrimaryColors(prevColors => {
-                            const newColors = prevColors.includes(color)
-                                ? prevColors.filter(c => c !== color)
-                                : [...prevColors, color];
-                            if (newColors.length > MAX_PRIMARY_COLORS) {
-                                toast({ title: "Color Limit", description: `Max ${MAX_PRIMARY_COLORS} colors.`, variant: "default" });
-                                return prevColors;
-                            }
-                            return newColors;
-                        });
+                      setPrimaryColors(prevColors => {
+                        const newColors = prevColors.includes(color)
+                          ? prevColors.filter(c => c !== color)
+                          : [...prevColors, color];
+                        if (newColors.length > MAX_PRIMARY_COLORS) {
+                          toast({ title: "Color Limit", description: `Max ${MAX_PRIMARY_COLORS} colors.`, variant: "default" });
+                          return prevColors;
+                        }
+                        return newColors;
+                      });
                     }}
                     disabled={isProcessing || (primaryColors.length >= MAX_PRIMARY_COLORS && !primaryColors.includes(color))}
+                    className="transition-transform duration-200 group-hover:scale-110"
                   />
-                  <Label htmlFor={`chat-color-${color}`} className={cn("text-xs font-normal cursor-pointer transition-colors", primaryColors.includes(color) ? "text-primary" : "text-foreground/70", (isProcessing || (primaryColors.length >= MAX_PRIMARY_COLORS && !primaryColors.includes(color))) && !primaryColors.includes(color) ? "opacity-50 cursor-not-allowed" : "")}>{color}</Label>
+                  <Label 
+                    htmlFor={`chat-color-${color}`} 
+                    className={cn(
+                      "text-xs font-normal cursor-pointer transition-all duration-200",
+                      primaryColors.includes(color) 
+                        ? "text-primary font-medium" 
+                        : "text-foreground/70 group-hover:text-foreground/90",
+                      (isProcessing || (primaryColors.length >= MAX_PRIMARY_COLORS && !primaryColors.includes(color))) && !primaryColors.includes(color) 
+                        ? "opacity-50 cursor-not-allowed" 
+                        : ""
+                    )}
+                  >
+                    {color}
+                  </Label>
                 </div>
               ))}
             </div>
-            <Button onClick={() => handlePrimaryColorSelect(primaryColors)} size="sm" className="mt-3 w-full" disabled={isProcessing}>
+            <Button 
+              onClick={() => handlePrimaryColorSelect(primaryColors)} 
+              size="sm" 
+              className="mt-3 w-full bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] hover:opacity-90 transition-all duration-200 transform hover:scale-[1.02]" 
+              disabled={isProcessing}
+            >
               Confirm Colors <Send className="ml-2 h-4 w-4"/>
             </Button>
           </div>
         );
       case "inspirationVideo":
         return (
-          <div className="mt-2 space-x-2 flex">
-            <Button onClick={() => handleInspirationChoice("yes")} variant="outline" size="sm" disabled={isProcessing}>Yes, find inspiration</Button>
-            <Button onClick={() => handleInspirationChoice("skip")} variant="ghost" size="sm" disabled={isProcessing}>Skip this</Button>
+          <div className="mt-2 p-3 bg-card/80 backdrop-blur-sm rounded-lg shadow-lg border border-white/5 transition-all duration-300 hover:border-white/10">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button 
+                onClick={() => handleInspirationChoice("yes")} 
+                className="flex-1 bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] hover:opacity-90 transition-all duration-200 transform hover:scale-[1.02] group" 
+                disabled={isProcessing}
+              >
+                <Youtube className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
+                Yes, find inspiration
+              </Button>
+              <Button 
+                onClick={() => handleInspirationChoice("skip")} 
+                variant="outline" 
+                className="flex-1 border-white/10 hover:border-white/20 hover:bg-white/5 transition-all duration-200 transform hover:scale-[1.02] group" 
+                disabled={isProcessing}
+              >
+                <X className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
+                Skip this
+              </Button>
+            </div>
           </div>
         );
       case "masterText":
@@ -721,48 +757,95 @@ function GeneratorChatPageInternal() {
     <>
     <div className="flex flex-col md:flex-row h-screen max-h-screen overflow-hidden bg-[#23243A]" style={{ backgroundImage: 'radial-gradient(ellipse at 50% 0%, #FF9900 0%, #FF3366 40%, #8B5CF6 80%, #23243A 100%)' }}>
       {/* Left Column: Chat Interface */}
-      <div className="w-full md:w-2/5 lg:w-1/3 flex flex-col border-r border-black bg-black h-full">
-        <div className="p-4 border-b border-black flex items-center justify-between sticky top-0 bg-black/90 backdrop-blur-md z-10">
-          <div className="flex items-center gap-2">
-            <AppLogo baseSize={8} withText={true}/>
-          </div>
-          <Button variant="ghost" size="sm" onClick={handleStartOver} disabled={isProcessing || currentStep === 'generating'} className="text-white hover:bg-gradient-to-r hover:from-[var(--brand-gradient-from)] hover:via-[var(--brand-gradient-via)] hover:to-[var(--brand-gradient-to)]">
-            <RefreshCw className="mr-2 h-4 w-4"/> Start Over
-          </Button>
-        </div>
-        <div className="flex flex-col flex-grow h-0 min-h-0 bg-black">
-          <ScrollArea className="flex-grow p-4 space-y-4 bg-black" ref={chatScrollRef}>
-            {chatMessages.map((msg) => (
-              <div
-                key={msg.id}
-                className={cn(
-                  "flex mb-3",
-                  msg.sender === "user" ? "justify-end" : "justify-start"
-                )}
-              >
-                <div
-                  className={cn(
-                    "max-w-[80%] p-2.5 rounded-xl shadow",
-                    msg.sender === "user" ? "bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] text-white rounded-br-none" : 
-                    msg.sender === "bot" && msg.type === "error" ? "bg-black/80 text-white rounded-bl-none border border-[var(--brand-gradient-from)]" :
-                    msg.sender === "bot" ? "bg-[#23243A] text-white rounded-bl-none" : 
-                    "bg-transparent text-white/60 text-xs italic text-center w-full" // system messages
-                  )}
-                >
-                  {msg.sender === "bot" && msg.type !== "loading" && msg.type !== "error" && <span className="inline-block align-middle mr-1.5 mb-0.5"><AppLogo baseSize={6} withText={false} /></span>}
-                  {msg.sender === "user" && <User className="h-5 w-5 inline mr-1.5 mb-0.5 text-white" />}
-                  {msg.type === "loading" ? <Loader2 className="h-5 w-5 animate-spin inline mr-1.5 text-[var(--brand-gradient-to)]" /> : null}
-                  {typeof msg.content === 'string' ? <span className="text-sm break-words whitespace-pre-wrap">{msg.content}</span> : msg.content}
-                  {msg.sender !== "system" && <p className={cn("text-xs mt-1.5", msg.sender === "user" ? "text-white/70 text-right" : "text-white/50 text-left")}>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
-                </div>
-              </div>
-            ))}
-          </ScrollArea>
-          {currentStep !== "generating" && currentStep !== "results" && (
-            <div className="sticky bottom-0 left-0 right-0 z-20 bg-black p-2 border-t border-black/30 shadow-xl">
-              {renderCurrentStepInput()}
+      <div className="w-full md:w-2/5 lg:w-1/3 flex flex-col bg-black/95 h-full relative p-[2px]">
+        <div className="absolute inset-0 rounded-none pointer-events-none" style={{
+          background: 'linear-gradient(90deg, var(--brand-gradient-from), var(--brand-gradient-via), var(--brand-gradient-to))',
+          opacity: 0.5,
+          zIndex: 0
+        }} />
+        <div className="relative flex flex-col h-full bg-black/95 z-10">
+          <div className="p-4 flex items-center justify-between sticky top-0 bg-black/95 backdrop-blur-md z-10">
+            <div className="flex items-center gap-2">
+              <AppLogo baseSize={8} withText={true}/>
             </div>
-          )}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleStartOver} 
+              disabled={isProcessing || currentStep === 'generating'} 
+              className="text-white hover:bg-gradient-to-r hover:from-[var(--brand-gradient-from)] hover:via-[var(--brand-gradient-via)] hover:to-[var(--brand-gradient-to)] transition-all duration-200"
+            >
+              <RefreshCw className="mr-2 h-4 w-4"/> Start Over
+            </Button>
+          </div>
+          <div className="h-[1px] w-full bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] opacity-50" />
+          <div className="flex flex-col flex-grow h-0 min-h-0 bg-black/95">
+            <ScrollArea className="flex-grow p-4 space-y-4 bg-black/95" ref={chatScrollRef}>
+              {chatMessages.map((msg, index) => (
+                <div
+                  key={msg.id}
+                  className={cn(
+                    "flex mb-3 animate-fade-in",
+                    msg.sender === "user" ? "justify-end" : "justify-start"
+                  )}
+                  style={{ animationDelay: `${index * 50}ms` }}
+                >
+                  <div
+                    className={cn(
+                      "max-w-[80%] p-3 rounded-2xl shadow-lg transition-all duration-300",
+                      msg.sender === "user" 
+                        ? "bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] text-white rounded-br-none hover:shadow-[var(--brand-gradient-to)]/20" 
+                        : msg.sender === "bot" && msg.type === "error" 
+                          ? "bg-black/80 text-white rounded-bl-none border border-[var(--brand-gradient-from)] hover:border-[var(--brand-gradient-to)]" 
+                          : msg.sender === "bot" 
+                            ? "bg-[#23243A] text-white rounded-bl-none hover:bg-[#2a2b45]" 
+                            : "bg-transparent text-white/60 text-xs italic text-center w-full"
+                    )}
+                  >
+                    {msg.sender === "bot" && msg.type !== "loading" && msg.type !== "error" && (
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <span className="inline-block align-middle">
+                          <AppLogo baseSize={6} withText={false} />
+                        </span>
+                        <span className="text-xs font-medium text-primary/90">ThumbBlitz AI</span>
+                      </div>
+                    )}
+                    {msg.sender === "user" && (
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <User className="h-5 w-5 text-white/90" />
+                        <span className="text-xs font-medium text-white/90">You</span>
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      {msg.type === "loading" ? (
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="h-5 w-5 animate-spin text-[var(--brand-gradient-to)]" />
+                          <span className="text-sm break-words whitespace-pre-wrap">{msg.content}</span>
+                        </div>
+                      ) : (
+                        <span className="text-sm break-words whitespace-pre-wrap">{msg.content}</span>
+                      )}
+                      {msg.sender !== "system" && (
+                        <p className={cn(
+                          "text-xs mt-2",
+                          msg.sender === "user" 
+                            ? "text-white/70 text-right" 
+                            : "text-white/50 text-left"
+                        )}>
+                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </ScrollArea>
+            {currentStep !== "generating" && currentStep !== "results" && (
+              <div className="sticky bottom-0 left-0 right-0 z-20 bg-black/95 p-3 border-t border-black/20 shadow-xl backdrop-blur-md">
+                {renderCurrentStepInput()}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
