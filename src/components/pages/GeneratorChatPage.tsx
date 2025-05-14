@@ -68,9 +68,8 @@ interface SelectedInspiration {
 }
 
 const masterTextFormSchema = z.object({
-  masterTextSentence1: z.string().max(MAX_SENTENCE_LENGTH, { message: `Max ${MAX_SENTENCE_LENGTH} chars.` }).optional(),
-  masterTextSentence2: z.string().max(MAX_SENTENCE_LENGTH, { message: `Max ${MAX_SENTENCE_LENGTH} chars.` }).optional(),
-  masterTextSentence3: z.string().max(MAX_SENTENCE_LENGTH, { message: `Max ${MAX_SENTENCE_LENGTH} chars.` }).optional(),
+  masterTextPrimary: z.string().max(MAX_SENTENCE_LENGTH, { message: `Max ${MAX_SENTENCE_LENGTH} chars.` }).optional(),
+  masterTextSecondary: z.string().max(MAX_SENTENCE_LENGTH, { message: `Max ${MAX_SENTENCE_LENGTH} chars.` }).optional(),
 });
 type MasterTextFormValues = z.infer<typeof masterTextFormSchema>;
 
@@ -121,13 +120,12 @@ function GeneratorChatPageInternal() {
   const messageIdCounter = React.useRef(0);
   const initialMessageSentRef = React.useRef(false);
 
-
   const { toast } = useToast();
   const envYouTubeApiKey = "AIzaSyD1JG9hr3ciY8QP1StCmYjByVd3LyBIaRw"; // Hardcoded as requested
 
   const masterTextForm = useForm<MasterTextFormValues>({
     resolver: zodResolver(masterTextFormSchema),
-    defaultValues: { masterTextSentence1: "", masterTextSentence2: "", masterTextSentence3: "" },
+    defaultValues: { masterTextPrimary: "", masterTextSecondary: "" },
   });
 
   const promptForm = useForm<PromptFormValues>({
@@ -137,35 +135,103 @@ function GeneratorChatPageInternal() {
 
   const chatScrollRef = React.useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    chatScrollRef.current?.scrollTo(0, chatScrollRef.current.scrollHeight);
-  }, [chatMessages]);
+  const [isTyping, setIsTyping] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Add typing animation component
+  const TypingAnimation = () => (
+    <div className="flex justify-start mb-3 animate-fade-in">
+      <div className="max-w-[80%] p-3 rounded-2xl bg-[#23243A] text-white rounded-bl-none shadow-lg">
+        <div className="flex items-center gap-1.5 mb-2">
+          <span className="inline-block align-middle">
+            <AppLogo baseSize={6} withText={false} />
+          </span>
+          <span className="text-xs font-medium text-primary/90">ThumbBlitz AI</span>
+        </div>
+        <div className="flex space-x-1">
+          <div className="w-2 h-2 bg-[var(--brand-gradient-to)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+          <div className="w-2 h-2 bg-[var(--brand-gradient-to)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+          <div className="w-2 h-2 bg-[var(--brand-gradient-to)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+        </div>
+      </div>
+    </div>
+  );
 
   const addMessage = useCallback((sender: ChatMessage["sender"], type: ChatMessage["type"], content: React.ReactNode) => {
     const newId = `msg-${Date.now()}-${messageIdCounter.current++}`;
     setChatMessages(prev => [...prev, { id: newId, sender, type, content, timestamp: new Date() }]);
   }, []);
 
-  // Initial bot message
+  // Add auto-scroll effect for chat messages
   useEffect(() => {
-    if (title && currentStep === "start" && !initialMessageSentRef.current && chatMessages.length === 0) {
+    if (chatScrollRef.current) {
+      const scrollContainer = chatScrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+    }
+  }, [chatMessages, isTyping, currentStep]);
+
+  // Add auto-scroll effect for input section
+  useEffect(() => {
+    if (!isTransitioning && currentStep !== "generating" && currentStep !== "results") {
+      setTimeout(() => {
+        if (chatScrollRef.current) {
+          const scrollContainer = chatScrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+          if (scrollContainer) {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+          }
+        }
+      }, 100); // Small delay to ensure the input section is rendered
+    }
+  }, [currentStep, isTransitioning]);
+
+  const addMessageWithTyping = (content: string, nextStep: ChatStep) => {
+    setIsTyping(true);
+    setIsTransitioning(true);
+
+    // Show typing animation for 2 seconds
+    setTimeout(() => {
+      addMessage("bot", "text", content);
+      setCurrentStep(nextStep);
+      setIsTyping(false);
+      setIsTransitioning(false);
+    }, 2000);
+  };
+
+  const initializeChat = useCallback(() => {
+    if (!initialMessageSentRef.current) {
+      // Add system message immediately
       addMessage("system", "text", `Starting thumbnail generation for: "${title}"`);
       initialMessageSentRef.current = true;
-      setTimeout(() => {
-        addMessage("bot", "text", "Great! Let's start by picking some primary colors you'd like to see in your thumbnails. (Optional)");
-        setCurrentStep("primaryColors");
-      }, 1000);
-    }
-  }, [title, addMessage, currentStep, chatMessages.length]);
+      setIsInitialized(true);
 
+      // Add first bot message with typing animation
+      addMessageWithTyping(
+        "Great! Let's start by picking some primary colors you'd like to see in your thumbnails. (Optional)",
+        "primaryColors"
+      );
+    }
+  }, [title, addMessage]);
+
+  // Initial bot message
+  useEffect(() => {
+    if (!isInitialized && title && currentStep === "start" && chatMessages.length === 0) {
+      initializeChat();
+    }
+  }, [title, currentStep, chatMessages.length, isInitialized, initializeChat]);
 
   const handlePrimaryColorSelect = (selectedColors: string[]) => {
+    if (isTransitioning) return;
+    
     setPrimaryColors(selectedColors);
     addMessage("user", "text", selectedColors.length > 0 ? `Selected colors: ${selectedColors.join(", ")}` : "Skipped color selection.");
-    setTimeout(() => {
-      addMessage("bot", "text", "Awesome! Now, would you like to find a YouTube video for visual inspiration? This can greatly influence the style.");
-      setCurrentStep("inspirationVideo");
-    }, 1000);
+    
+    addMessageWithTyping(
+      "Awesome! Now, would you like to find a YouTube video for visual inspiration? This can greatly influence the style.",
+      "inspirationVideo"
+    );
   };
   
   const handleInspirationChoice = (choice: "yes" | "skip") => {
@@ -176,10 +242,10 @@ function GeneratorChatPageInternal() {
     } else {
       addMessage("user", "text", "No, I'll skip video inspiration for now.");
       setSelectedInspirations([]);
-      setTimeout(() => {
-        addMessage("bot", "text", "Okay. Next, do you want to specify any 'Master Text'? This text will be the ONLY text on your thumbnails, overriding everything else.");
-        setCurrentStep("masterText");
-      }, 1000);
+      addMessageWithTyping(
+        "Okay. Next, do you want to specify any 'Master Text'? This text will be the ONLY text on your thumbnails, overriding everything else.",
+        "masterText"
+      );
     }
   };
 
@@ -187,17 +253,16 @@ function GeneratorChatPageInternal() {
     if (selectedInspirations.length > 0) {
       addMessage("user", "text", `Selected ${selectedInspirations.length} video(s) for inspiration.`);
       setShowYouTubeModal(false);
-      setShowInspirationLevelModal(true); // This will now be handled by currentStep change
+      setShowInspirationLevelModal(true);
       setCurrentStep("adjustInspiration");
       addMessage("bot", "text", "Let's adjust the influence levels and details for your chosen inspirations.");
-
     } else {
       addMessage("user", "text", "No inspiration videos selected.");
       setShowYouTubeModal(false);
-      setTimeout(() => {
-        addMessage("bot", "text", "Okay. Next, do you want to specify any 'Master Text'? This text will be the ONLY text on your thumbnails, overriding everything else.");
-        setCurrentStep("masterText");
-      }, 1000);
+      addMessageWithTyping(
+        "Okay. Next, do you want to specify any 'Master Text'? This text will be the ONLY text on your thumbnails, overriding everything else.",
+        "masterText"
+      );
     }
   };
   
@@ -205,23 +270,23 @@ function GeneratorChatPageInternal() {
     addMessage("user", "text", "Skipped video inspiration.");
     setShowYouTubeModal(false);
     setSelectedInspirations([]);
-    setTimeout(() => {
-      addMessage("bot", "text", "Okay. Next, do you want to specify any 'Master Text'? This text will be the ONLY text on your thumbnails, overriding everything else.");
-      setCurrentStep("masterText");
-    }, 1000);
+    addMessageWithTyping(
+      "Okay. Next, do you want to specify any 'Master Text'? This text will be the ONLY text on your thumbnails, overriding everything else.",
+      "masterText"
+    );
   };
 
   const handleConfirmInspirationAndProceed = () => {
     addMessage("user", "text", "Inspiration details confirmed.");
     setShowInspirationLevelModal(false);
-    setTimeout(() => {
-      addMessage("bot", "text", "Got it. Now, do you want to specify any 'Master Text'? This text (up to 3 sentences) will be the ONLY text on your thumbnails.");
-      setCurrentStep("masterText");
-    }, 1000);
+    addMessageWithTyping(
+      "Got it. Now, do you want to specify any 'Master Text'? This text (up to 3 sentences) will be the ONLY text on your thumbnails.",
+      "masterText"
+    );
   };
   
   const handleMasterTextSubmit = (data: MasterTextFormValues) => {
-    const sentences = [data.masterTextSentence1, data.masterTextSentence2, data.masterTextSentence3].filter(Boolean) as string[];
+    const sentences = [data.masterTextPrimary, data.masterTextSecondary].filter(Boolean) as string[];
     setMasterTextSentences(sentences);
     if (sentences.length > 0) {
       addMessage("user", "text", `Master text set: ${sentences.map(s => `"${s}"`).join("; ")}`);
@@ -229,10 +294,10 @@ function GeneratorChatPageInternal() {
       addMessage("user", "text", "Skipped master text.");
     }
     masterTextForm.reset();
-    setTimeout(() => {
-      addMessage("bot", "text", "Finally, do you have a base description or prompt in mind? Or would you like me to generate one based on your title and inspirations (if any)?");
-      setCurrentStep("basePrompt");
-    }, 1000);
+    addMessageWithTyping(
+      "Finally, do you have a base description or prompt in mind? Or would you like me to generate one based on your title and inspirations (if any)?",
+      "basePrompt"
+    );
   };
 
   const handlePromptSubmit = async (data: PromptFormValues, action: "submit" | "enhance" | "generate") => {
@@ -589,6 +654,7 @@ function GeneratorChatPageInternal() {
   };
 
   const handleStartOver = () => {
+    // Reset all states
     setTitle(initialTitle); 
     setPrimaryColors([]);
     setSelectedInspirations([]);
@@ -603,11 +669,16 @@ function GeneratorChatPageInternal() {
     setHasUserEnhancedPrompt(false);
     setLastEnhancedPrompt(null);
     messageIdCounter.current = 0; 
-    initialMessageSentRef.current = false; 
+    initialMessageSentRef.current = false;
+    setIsTyping(false);
+    setIsTransitioning(false);
+    setIsInitialized(false);
 
-     if (initialTitle) {
-      // No need to add "Starting..." system message again as initial useEffect will handle it on currentStep change.
-      // Let the natural flow of useEffect trigger the first bot message.
+    // Start new conversation after a small delay
+    if (initialTitle) {
+      setTimeout(() => {
+        initializeChat();
+      }, 100);
     }
   };
 
@@ -616,127 +687,348 @@ function GeneratorChatPageInternal() {
     switch (currentStep) {
       case "primaryColors":
         return (
-          <div className="mt-2 p-3 bg-card/80 backdrop-blur-sm rounded-lg shadow-lg border border-white/5 transition-all duration-300 hover:border-white/10">
-            <Label className="text-sm font-medium text-foreground/90 flex items-center gap-2 mb-2">
-              <PaletteIcon className="h-4 w-4 text-primary/80" /> Select Primary Colors (Up to {MAX_PRIMARY_COLORS})
-            </Label>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-x-2 gap-y-2">
-              {PREDEFINED_COLORS.map(color => (
-                <div key={color} className="flex items-center space-x-1.5 group">
-                  <Checkbox
-                    id={`chat-color-${color}`}
-                    checked={primaryColors.includes(color)}
-                    onCheckedChange={() => {
-                      setPrimaryColors(prevColors => {
-                        const newColors = prevColors.includes(color)
-                          ? prevColors.filter(c => c !== color)
-                          : [...prevColors, color];
-                        if (newColors.length > MAX_PRIMARY_COLORS) {
-                          toast({ title: "Color Limit", description: `Max ${MAX_PRIMARY_COLORS} colors.`, variant: "default" });
-                          return prevColors;
-                        }
-                        return newColors;
-                      });
-                    }}
-                    disabled={isProcessing || (primaryColors.length >= MAX_PRIMARY_COLORS && !primaryColors.includes(color))}
-                    className="transition-transform duration-200 group-hover:scale-110"
-                  />
-                  <Label 
-                    htmlFor={`chat-color-${color}`} 
+          <div className="p-4 bg-black/40 backdrop-blur-sm rounded-lg shadow-lg relative">
+            <div className="absolute inset-0 rounded-lg pointer-events-none" style={{
+              background: 'linear-gradient(90deg, var(--brand-gradient-from), var(--brand-gradient-via), var(--brand-gradient-to))',
+              opacity: 0.1,
+              zIndex: 0
+            }} />
+            <div className="absolute inset-0 rounded-lg pointer-events-none" style={{
+              border: '1px solid transparent',
+              background: 'linear-gradient(90deg, var(--brand-gradient-from), var(--brand-gradient-via), var(--brand-gradient-to)) border-box',
+              WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+              WebkitMaskComposite: 'xor',
+              maskComposite: 'exclude',
+              zIndex: 1
+            }} />
+            <div className="relative z-10">
+              <Label className="text-sm font-medium text-foreground/90 flex items-center gap-2 mb-3">
+                <PaletteIcon className="h-4 w-4 text-[var(--brand-gradient-to)]" /> 
+                <span className="bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] bg-clip-text text-transparent">
+                  Select Primary Colors (Up to {MAX_PRIMARY_COLORS})
+                </span>
+              </Label>
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                {PREDEFINED_COLORS.map(color => (
+                  <div 
+                    key={color} 
                     className={cn(
-                      "text-xs font-normal cursor-pointer transition-all duration-200",
+                      "group relative flex items-center space-x-2 p-2 rounded-lg transition-all duration-200",
                       primaryColors.includes(color) 
-                        ? "text-primary font-medium" 
-                        : "text-foreground/70 group-hover:text-foreground/90",
-                      (isProcessing || (primaryColors.length >= MAX_PRIMARY_COLORS && !primaryColors.includes(color))) && !primaryColors.includes(color) 
-                        ? "opacity-50 cursor-not-allowed" 
-                        : ""
+                        ? "bg-gradient-to-r from-[var(--brand-gradient-from)]/20 via-[var(--brand-gradient-via)]/20 to-[var(--brand-gradient-to)]/20 border border-[var(--brand-gradient-to)]/30" 
+                        : "hover:bg-white/5 border border-transparent"
                     )}
                   >
-                    {color}
-                  </Label>
-                </div>
-              ))}
+                    <Checkbox
+                      id={`chat-color-${color}`}
+                      checked={primaryColors.includes(color)}
+                      onCheckedChange={() => {
+                        setPrimaryColors(prevColors => {
+                          const newColors = prevColors.includes(color)
+                            ? prevColors.filter(c => c !== color)
+                            : [...prevColors, color];
+                          if (newColors.length > MAX_PRIMARY_COLORS) {
+                            toast({ title: "Color Limit", description: `Max ${MAX_PRIMARY_COLORS} colors.`, variant: "default" });
+                            return prevColors;
+                          }
+                          return newColors;
+                        });
+                      }}
+                      disabled={isProcessing || (primaryColors.length >= MAX_PRIMARY_COLORS && !primaryColors.includes(color))}
+                      className={cn(
+                        "transition-all duration-200",
+                        primaryColors.includes(color) 
+                          ? "border-[var(--brand-gradient-to)] data-[state=checked]:bg-[var(--brand-gradient-to)]" 
+                          : "border-white/20"
+                      )}
+                    />
+                    <Label 
+                      htmlFor={`chat-color-${color}`} 
+                      className={cn(
+                        "text-xs font-medium cursor-pointer transition-all duration-200 flex-1",
+                        primaryColors.includes(color) 
+                          ? "text-[var(--brand-gradient-to)]" 
+                          : "text-white/70 group-hover:text-white/90",
+                        (isProcessing || (primaryColors.length >= MAX_PRIMARY_COLORS && !primaryColors.includes(color))) && !primaryColors.includes(color) 
+                          ? "opacity-50 cursor-not-allowed" 
+                          : ""
+                      )}
+                    >
+                      {color}
+                    </Label>
+                    <div 
+                      className={cn(
+                        "w-3 h-3 rounded-full transition-all duration-200",
+                        primaryColors.includes(color) ? "ring-2 ring-[var(--brand-gradient-to)]" : "ring-1 ring-white/20"
+                      )}
+                      style={{ backgroundColor: color.toLowerCase() }}
+                    />
+                  </div>
+                ))}
+              </div>
+              <Button 
+                onClick={() => handlePrimaryColorSelect(primaryColors)} 
+                size="sm" 
+                className={cn(
+                  "mt-4 w-full transition-all duration-200 transform hover:scale-[1.02]",
+                  primaryColors.length > 0
+                    ? "bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] hover:opacity-90"
+                    : "bg-white/10 hover:bg-white/20 text-white/70 hover:text-white"
+                )}
+                disabled={isProcessing}
+              >
+                {primaryColors.length > 0 ? (
+                  <>
+                    Choose {primaryColors.length} Color{primaryColors.length > 1 ? 's' : ''} <Send className="ml-2 h-4 w-4" />
+                  </>
+                ) : (
+                  <>
+                    Skip Colors <X className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
             </div>
-            <Button 
-              onClick={() => handlePrimaryColorSelect(primaryColors)} 
-              size="sm" 
-              className="mt-3 w-full bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] hover:opacity-90 transition-all duration-200 transform hover:scale-[1.02]" 
-              disabled={isProcessing}
-            >
-              Confirm Colors <Send className="ml-2 h-4 w-4"/>
-            </Button>
           </div>
         );
       case "inspirationVideo":
         return (
-          <div className="mt-2 p-3 bg-card/80 backdrop-blur-sm rounded-lg shadow-lg border border-white/5 transition-all duration-300 hover:border-white/10">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button 
-                onClick={() => handleInspirationChoice("yes")} 
-                className="flex-1 bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] hover:opacity-90 transition-all duration-200 transform hover:scale-[1.02] group" 
-                disabled={isProcessing}
-              >
-                <Youtube className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
-                Yes, find inspiration
-              </Button>
-              <Button 
-                onClick={() => handleInspirationChoice("skip")} 
-                variant="outline" 
-                className="flex-1 border-white/10 hover:border-white/20 hover:bg-white/5 transition-all duration-200 transform hover:scale-[1.02] group" 
-                disabled={isProcessing}
-              >
-                <X className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
-                Skip this
-              </Button>
+          <div className="p-4 bg-black/40 backdrop-blur-sm rounded-lg shadow-lg relative">
+            <div className="absolute inset-0 rounded-lg pointer-events-none" style={{
+              background: 'linear-gradient(90deg, var(--brand-gradient-from), var(--brand-gradient-via), var(--brand-gradient-to))',
+              opacity: 0.1,
+              zIndex: 0
+            }} />
+            <div className="absolute inset-0 rounded-lg pointer-events-none" style={{
+              border: '1px solid transparent',
+              background: 'linear-gradient(90deg, var(--brand-gradient-from), var(--brand-gradient-via), var(--brand-gradient-to)) border-box',
+              WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+              WebkitMaskComposite: 'xor',
+              maskComposite: 'exclude',
+              zIndex: 1
+            }} />
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-3">
+                <Youtube className="h-4 w-4 text-[var(--brand-gradient-to)]" />
+                <span className="bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] bg-clip-text text-transparent font-medium">
+                  Find Inspiration
+                </span>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button 
+                  onClick={() => handleInspirationChoice("yes")} 
+                  className="flex-1 group relative overflow-hidden bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] hover:opacity-90 transition-all duration-200 transform hover:scale-[1.02]"
+                  disabled={isProcessing}
+                >
+                  <div className="relative flex items-center justify-center gap-2">
+                    <Youtube className="h-5 w-5 group-hover:scale-110 transition-transform duration-200" />
+                    <span className="font-medium">Yes, find inspiration</span>
+                  </div>
+                </Button>
+                <Button 
+                  onClick={() => handleInspirationChoice("skip")} 
+                  variant="outline" 
+                  className="flex-1 group relative overflow-hidden bg-white/10 hover:bg-white/20 text-white/70 hover:text-white border-white/10 hover:border-white/20 transition-all duration-200 transform hover:scale-[1.02]"
+                  disabled={isProcessing}
+                >
+                  <div className="relative flex items-center justify-center gap-2">
+                    <X className="h-5 w-5 group-hover:scale-110 transition-transform duration-200" />
+                    <span className="font-medium">Skip this</span>
+                  </div>
+                </Button>
+              </div>
             </div>
           </div>
         );
       case "masterText":
         return (
-          <form onSubmit={masterTextForm.handleSubmit(handleMasterTextSubmit)} className="mt-2 p-3 bg-card rounded-lg shadow space-y-3">
-            {[1, 2, 3].map(num => (
-              <div key={num}>
-                <Label htmlFor={`chatMasterText${num}`} className="text-xs font-medium">Sentence {num}</Label>
-                <Input
-                  id={`chatMasterText${num}`}
-                  placeholder={`Optional sentence ${num} (max ${MAX_SENTENCE_LENGTH} chars)`}
-                  {...masterTextForm.register(`masterTextSentence${num}` as keyof MasterTextFormValues)}
-                  className="text-sm mt-1"
-                  disabled={isProcessing}
-                />
-                {masterTextForm.formState.errors[`masterTextSentence${num}` as keyof MasterTextFormValues] && 
-                  <p className="text-xs text-destructive mt-0.5">{masterTextForm.formState.errors[`masterTextSentence${num}` as keyof MasterTextFormValues]?.message}</p>
-                }
+          <form onSubmit={masterTextForm.handleSubmit(handleMasterTextSubmit)} className="p-4 bg-black/40 backdrop-blur-sm rounded-lg shadow-lg relative">
+            <div className="absolute inset-0 rounded-lg pointer-events-none" style={{
+              background: 'linear-gradient(90deg, var(--brand-gradient-from), var(--brand-gradient-via), var(--brand-gradient-to))',
+              opacity: 0.1,
+              zIndex: 0
+            }} />
+            <div className="absolute inset-0 rounded-lg pointer-events-none" style={{
+              border: '1px solid transparent',
+              background: 'linear-gradient(90deg, var(--brand-gradient-from), var(--brand-gradient-via), var(--brand-gradient-to)) border-box',
+              WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+              WebkitMaskComposite: 'xor',
+              maskComposite: 'exclude',
+              zIndex: 1
+            }} />
+            <div className="relative z-10 space-y-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Type className="h-4 w-4 text-[var(--brand-gradient-to)]" />
+                <span className="bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] bg-clip-text text-transparent font-medium">
+                  Master Text (Optional)
+                </span>
               </div>
-            ))}
-            <Button type="submit" size="sm" className="w-full" disabled={isProcessing}>
-              Confirm Master Text <Send className="ml-2 h-4 w-4"/>
-            </Button>
+              
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="chatMasterTextPrimary" className="text-xs font-medium text-white/90">
+                    Primary Text
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="chatMasterTextPrimary"
+                      placeholder="Enter primary text (max 70 chars)"
+                      {...masterTextForm.register("masterTextPrimary")}
+                      className="bg-black/40 border-white/10 text-white placeholder:text-white/40 focus:border-[var(--brand-gradient-to)] focus:ring-[var(--brand-gradient-to)]/20 transition-all duration-200"
+                      disabled={isProcessing}
+                    />
+                    {masterTextForm.watch("masterTextPrimary") && (
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-white/40">
+                        {(masterTextForm.watch("masterTextPrimary") || "").length}/70
+                      </div>
+                    )}
+                  </div>
+                  {masterTextForm.formState.errors.masterTextPrimary && 
+                    <p className="text-xs text-[var(--brand-gradient-from)] mt-1">{masterTextForm.formState.errors.masterTextPrimary?.message}</p>
+                  }
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="chatMasterTextSecondary" className="text-xs font-medium text-white/90">
+                    Secondary Text
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="chatMasterTextSecondary"
+                      placeholder="Enter secondary text (max 70 chars)"
+                      {...masterTextForm.register("masterTextSecondary")}
+                      className="bg-black/40 border-white/10 text-white placeholder:text-white/40 focus:border-[var(--brand-gradient-to)] focus:ring-[var(--brand-gradient-to)]/20 transition-all duration-200"
+                      disabled={isProcessing}
+                    />
+                    {masterTextForm.watch("masterTextSecondary") && (
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-white/40">
+                        {(masterTextForm.watch("masterTextSecondary") || "").length}/70
+                      </div>
+                    )}
+                  </div>
+                  {masterTextForm.formState.errors.masterTextSecondary && 
+                    <p className="text-xs text-[var(--brand-gradient-from)] mt-1">{masterTextForm.formState.errors.masterTextSecondary?.message}</p>
+                  }
+                </div>
+              </div>
+
+              <Button 
+                type="submit" 
+                size="sm" 
+                className={cn(
+                  "w-full transition-all duration-200 transform hover:scale-[1.02]",
+                  (masterTextForm.watch("masterTextPrimary") || masterTextForm.watch("masterTextSecondary"))
+                    ? "bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] hover:opacity-90"
+                    : "bg-white/10 hover:bg-white/20 text-white/70 hover:text-white"
+                )}
+                disabled={isProcessing}
+              >
+                {(masterTextForm.watch("masterTextPrimary") || masterTextForm.watch("masterTextSecondary")) ? (
+                  <>
+                    Choose Text <Send className="ml-2 h-4 w-4" />
+                  </>
+                ) : (
+                  <>
+                    Skip Text <X className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            </div>
           </form>
         );
         case "basePrompt":
           return (
-            <form onSubmit={promptForm.handleSubmit(data => handlePromptSubmit(data, "submit"))} className="mt-2 p-3 bg-card rounded-lg shadow space-y-3">
-              <Textarea
-                placeholder="Describe your thumbnail, or let AI generate/enhance..."
-                {...promptForm.register("initialPrompt")}
-                className="min-h-[100px] text-sm"
-                disabled={isProcessing}
-              />
-              {promptForm.formState.errors.initialPrompt && 
-                  <p className="text-xs text-destructive mt-0.5">{promptForm.formState.errors.initialPrompt.message}</p>
-              }
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <Button type="button" onClick={promptForm.handleSubmit(data => handlePromptSubmit(data, "generate"))} variant="outline" size="sm" disabled={isProcessing}>
-                  <Sparkles className="mr-1.5 h-4 w-4" /> Generate
-                </Button>
-                <Button type="button" onClick={promptForm.handleSubmit(data => handlePromptSubmit(data, "enhance"))} variant="outline" size="sm" disabled={isProcessing || !promptForm.watch("initialPrompt")?.trim()}>
-                  <Wand2 className="mr-1.5 h-4 w-4" /> Enhance
-                </Button>
-                <Button type="submit" size="sm" className="sm:col-span-1" disabled={isProcessing}>
-                  Use & Generate <Send className="ml-1.5 h-4 w-4"/>
-                </Button>
+            <form onSubmit={promptForm.handleSubmit(data => handlePromptSubmit(data, "submit"))} className="p-4 bg-black/40 backdrop-blur-sm rounded-lg shadow-lg relative">
+              <div className="absolute inset-0 rounded-lg pointer-events-none" style={{
+                background: 'linear-gradient(90deg, var(--brand-gradient-from), var(--brand-gradient-via), var(--brand-gradient-to))',
+                opacity: 0.1,
+                zIndex: 0
+              }} />
+              <div className="absolute inset-0 rounded-lg pointer-events-none" style={{
+                border: '1px solid transparent',
+                background: 'linear-gradient(90deg, var(--brand-gradient-from), var(--brand-gradient-via), var(--brand-gradient-to)) border-box',
+                WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                WebkitMaskComposite: 'xor',
+                maskComposite: 'exclude',
+                zIndex: 1
+              }} />
+              <div className="relative z-10 space-y-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Wand2 className="h-4 w-4 text-[var(--brand-gradient-to)]" />
+                  <span className="bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] bg-clip-text text-transparent font-medium">
+                    Thumbnail Description
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Textarea
+                      placeholder="Describe your thumbnail, or let AI generate/enhance..."
+                      {...promptForm.register("initialPrompt")}
+                      className="min-h-[100px] bg-black/40 border-white/10 text-white placeholder:text-white/40 focus:border-[var(--brand-gradient-to)] focus:ring-[var(--brand-gradient-to)]/20 transition-all duration-200 resize-none"
+                      disabled={isProcessing}
+                    />
+                    {promptForm.watch("initialPrompt") && (
+                      <div className="absolute right-2 bottom-2 text-xs text-white/40">
+                        {(promptForm.watch("initialPrompt") || "").length}/1500
+                      </div>
+                    )}
+                  </div>
+                  {promptForm.formState.errors.initialPrompt && 
+                    <p className="text-xs text-[var(--brand-gradient-from)] mt-1">{promptForm.formState.errors.initialPrompt.message}</p>
+                  }
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <Button 
+                    type="button" 
+                    onClick={promptForm.handleSubmit(data => handlePromptSubmit(data, "generate"))} 
+                    variant="outline" 
+                    size="sm" 
+                    disabled={isProcessing}
+                    className="group relative overflow-hidden bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] hover:opacity-90 text-white border-transparent transition-all duration-200"
+                  >
+                    <div className="relative flex items-center justify-center gap-2">
+                      <Sparkles className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
+                      <span>Generate</span>
+                    </div>
+                  </Button>
+
+                  <Button 
+                    type="button" 
+                    onClick={promptForm.handleSubmit(data => handlePromptSubmit(data, "enhance"))} 
+                    variant="outline" 
+                    size="sm" 
+                    disabled={isProcessing || !promptForm.watch("initialPrompt")?.trim()}
+                    className="group relative overflow-hidden bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] hover:opacity-90 text-white border-transparent transition-all duration-200"
+                  >
+                    <div className="relative flex items-center justify-center gap-2">
+                      <Wand2 className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
+                      <span>Enhance</span>
+                    </div>
+                  </Button>
+
+                  <Button 
+                    type="submit" 
+                    size="sm" 
+                    disabled={isProcessing}
+                    className={cn(
+                      "transition-all duration-200 transform hover:scale-[1.02]",
+                      promptForm.watch("initialPrompt")?.trim()
+                        ? "bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] hover:opacity-90"
+                        : "bg-white/10 hover:bg-white/20 text-white/70 hover:text-white"
+                    )}
+                  >
+                    {promptForm.watch("initialPrompt")?.trim() ? (
+                      <>
+                        Use & Generate <Send className="ml-2 h-4 w-4" />
+                      </>
+                    ) : (
+                      <>
+                        Skip Prompt <X className="ml-2 h-4 w-4" />
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
             </form>
           );
@@ -780,13 +1072,14 @@ function GeneratorChatPageInternal() {
           </div>
           <div className="h-[1px] w-full bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] opacity-50" />
           <div className="flex flex-col flex-grow h-0 min-h-0 bg-black/95">
-            <ScrollArea className="flex-grow p-4 space-y-4 bg-black/95" ref={chatScrollRef}>
+            <ScrollArea className="flex-grow p-4 space-y-4 bg-black/95 [&_[data-radix-scroll-area-viewport]]:bg-black/95 [&_[data-radix-scroll-area-thumb]]:bg-gradient-to-b [&_[data-radix-scroll-area-thumb]]:from-[var(--brand-gradient-from)] [&_[data-radix-scroll-area-thumb]]:via-[var(--brand-gradient-via)] [&_[data-radix-scroll-area-thumb]]:to-[var(--brand-gradient-to)] [&_[data-radix-scroll-area-thumb]]:w-1.5 [&_[data-radix-scroll-area-thumb]]:rounded-full [&_[data-radix-scroll-area-thumb]]:opacity-50 hover:[&_[data-radix-scroll-area-thumb]]:opacity-80 [&_[data-radix-scroll-area-thumb]]:transition-opacity" ref={chatScrollRef}>
               {chatMessages.map((msg, index) => (
                 <div
                   key={msg.id}
                   className={cn(
                     "flex mb-3 animate-fade-in",
-                    msg.sender === "user" ? "justify-end" : "justify-start"
+                    msg.sender === "user" ? "justify-end" : "justify-start",
+                    msg.sender === "system" && "justify-center"
                   )}
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
@@ -799,7 +1092,7 @@ function GeneratorChatPageInternal() {
                           ? "bg-black/80 text-white rounded-bl-none border border-[var(--brand-gradient-from)] hover:border-[var(--brand-gradient-to)]" 
                           : msg.sender === "bot" 
                             ? "bg-[#23243A] text-white rounded-bl-none hover:bg-[#2a2b45]" 
-                            : "bg-transparent text-white/60 text-xs italic text-center w-full"
+                            : "bg-black/40 text-white/70 text-xs italic text-center w-full max-w-md backdrop-blur-sm border border-white/5 hover:border-white/10"
                     )}
                   >
                     {msg.sender === "bot" && msg.type !== "loading" && msg.type !== "error" && (
@@ -823,7 +1116,13 @@ function GeneratorChatPageInternal() {
                           <span className="text-sm break-words whitespace-pre-wrap">{msg.content}</span>
                         </div>
                       ) : (
-                        <span className="text-sm break-words whitespace-pre-wrap">{msg.content}</span>
+                        <span className={cn(
+                          "text-sm break-words whitespace-pre-wrap",
+                          msg.sender === "system" && "flex items-center justify-center gap-2"
+                        )}>
+                          {msg.sender === "system" && <Sparkles className="h-4 w-4 text-[var(--brand-gradient-to)]" />}
+                          {msg.content}
+                        </span>
                       )}
                       {msg.sender !== "system" && (
                         <p className={cn(
@@ -839,9 +1138,10 @@ function GeneratorChatPageInternal() {
                   </div>
                 </div>
               ))}
+              {isTyping && <TypingAnimation />}
             </ScrollArea>
-            {currentStep !== "generating" && currentStep !== "results" && (
-              <div className="sticky bottom-0 left-0 right-0 z-20 bg-black/95 p-3 border-t border-black/20 shadow-xl backdrop-blur-md">
+            {currentStep !== "generating" && currentStep !== "results" && !isTransitioning && (
+              <div className="sticky bottom-0 left-0 right-0 z-20 bg-black/95 p-3 pt-0 border-t border-black/20 shadow-xl backdrop-blur-md">
                 {renderCurrentStepInput()}
               </div>
             )}
@@ -850,58 +1150,65 @@ function GeneratorChatPageInternal() {
       </div>
 
       {/* Right Column: Preview & Controls */}
-      <div className="w-full md:w-3/5 lg:w-2/3 flex flex-col p-2 sm:p-4 md:p-6 bg-[#23243A] h-full overflow-y-auto">
-         <div className="flex items-center justify-end mb-4">
+      <div className="w-full md:w-3/5 lg:w-2/3 flex flex-col p-2 sm:p-4 md:p-6 bg-[#23243A] h-full overflow-y-auto relative">
+        <div className="absolute inset-0 pointer-events-none" style={{
+          background: 'linear-gradient(90deg, var(--brand-gradient-from), var(--brand-gradient-via), var(--brand-gradient-to))',
+          opacity: 0.1,
+          zIndex: 0
+        }} />
+        <div className="relative z-10">
+          <div className="flex items-center justify-end mb-4">
             <div className="text-right">
-                <p className="text-xs text-white/60">Content Title:</p>
-                <h1 className="text-xl font-extrabold bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] bg-clip-text text-transparent truncate max-w-xs sm:max-w-md md:max-w-lg" title={title}>{title}</h1>
+              <p className="text-xs text-white/60">Content Title:</p>
+              <h1 className="text-xl font-extrabold bg-gradient-to-r from-[var(--brand-gradient-from)] via-[var(--brand-gradient-via)] to-[var(--brand-gradient-to)] bg-clip-text text-transparent truncate max-w-xs sm:max-w-md md:max-w-lg" title={title}>{title}</h1>
             </div>
-        </div>
-        <div className="flex-grow grid grid-cols-1 sm:grid-cols-2 gap-4 items-center justify-center">
-          {thumbnailUrls.map((url, index) => (
-            <Card key={index} className="aspect-[16/9] relative group/thumb overflow-hidden rounded-2xl border border-black bg-black flex items-center justify-center transition-all duration-300 hover:scale-[1.03] cursor-pointer p-0 group hover:border-2 hover:border-transparent hover:bg-black hover:bg-clip-padding hover:[background-origin:border-box] hover:[position:relative]">
-              <span className="pointer-events-none absolute inset-0 rounded-2xl z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" style={{
-                border: '2px solid transparent',
-                background: 'linear-gradient(90deg, #FF9900, #FF3366, #8B5CF6) border-box',
-                WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                WebkitMaskComposite: 'xor',
-                maskComposite: 'exclude',
-              }} />
-              {isProcessing && currentStep === "generating" && !url && (
-                <div className="flex flex-col items-center text-muted-foreground">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
-                  <span className="text-xs">Generating {index + 1}...</span>
-                </div>
-              )}
-              {!isProcessing && !url && !generationError && (
-                 <ImageIcon className="h-12 w-12 text-muted-foreground/30" data-ai-hint="placeholder image" />
-              )}
-              {url && !url.startsWith("data:image/svg+xml") && ( 
-                <Image src={url} alt={`Generated thumbnail ${index + 1}`} layout="fill" objectFit="contain" className="transition-transform duration-300 group-hover/thumb:scale-105" data-ai-hint="generated image" />
-              )}
-              {url && !url.startsWith("data:image/svg+xml") && (
-                <Button onClick={() => handleDownload(url, index)} size="icon" variant="ghost" className="absolute top-1.5 right-1.5 bg-black/40 hover:bg-black/60 text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity h-7 w-7 z-10">
-                  <Download className="h-3.5 w-3.5" />
-                </Button>
-              )}
-            </Card>
-          ))}
-        </div>
-
-        {generationError && (
-          <div className="mt-4 p-3 bg-destructive/10 border border-destructive/30 rounded-md text-destructive text-sm">
-            <AlertTriangle className="h-5 w-5 inline mr-2" />
-            <strong>Generation Error:</strong> {generationError}
           </div>
-        )}
-
-        {(currentStep === "results" || generationError) && !isProcessing && (
-          <div className="mt-6 flex justify-end">
-            <Button onClick={handleRegenerate} variant="outline" size="lg" disabled={isProcessing}>
-              <RefreshCw className="mr-2 h-5 w-5" /> Regenerate Thumbnails
-            </Button>
+          <div className="flex-grow grid grid-cols-1 sm:grid-cols-2 gap-4 items-center justify-center">
+            {thumbnailUrls.map((url, index) => (
+              <Card key={index} className="aspect-[16/9] relative group/thumb overflow-hidden rounded-2xl border border-black bg-black flex items-center justify-center transition-all duration-300 hover:scale-[1.03] cursor-pointer p-0 group hover:border-2 hover:border-transparent hover:bg-black hover:bg-clip-padding hover:[background-origin:border-box] hover:[position:relative]">
+                <span className="pointer-events-none absolute inset-0 rounded-2xl z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" style={{
+                  border: '2px solid transparent',
+                  background: 'linear-gradient(90deg, #FF9900, #FF3366, #8B5CF6) border-box',
+                  WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                  WebkitMaskComposite: 'xor',
+                  maskComposite: 'exclude',
+                }} />
+                {isProcessing && currentStep === "generating" && !url && (
+                  <div className="flex flex-col items-center text-muted-foreground">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+                    <span className="text-xs">Generating {index + 1}...</span>
+                  </div>
+                )}
+                {!isProcessing && !url && !generationError && (
+                  <ImageIcon className="h-12 w-12 text-muted-foreground/30" data-ai-hint="placeholder image" />
+                )}
+                {url && !url.startsWith("data:image/svg+xml") && ( 
+                  <Image src={url} alt={`Generated thumbnail ${index + 1}`} layout="fill" objectFit="contain" className="transition-transform duration-300 group-hover/thumb:scale-105" data-ai-hint="generated image" />
+                )}
+                {url && !url.startsWith("data:image/svg+xml") && (
+                  <Button onClick={() => handleDownload(url, index)} size="icon" variant="ghost" className="absolute top-1.5 right-1.5 bg-black/40 hover:bg-black/60 text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity h-7 w-7 z-10">
+                    <Download className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </Card>
+            ))}
           </div>
-        )}
+
+          {generationError && (
+            <div className="mt-4 p-3 bg-destructive/10 border border-destructive/30 rounded-md text-destructive text-sm">
+              <AlertTriangle className="h-5 w-5 inline mr-2" />
+              <strong>Generation Error:</strong> {generationError}
+            </div>
+          )}
+
+          {(currentStep === "results" || generationError) && !isProcessing && (
+            <div className="mt-6 flex justify-end">
+              <Button onClick={handleRegenerate} variant="outline" size="lg" disabled={isProcessing}>
+                <RefreshCw className="mr-2 h-5 w-5" /> Regenerate Thumbnails
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
 
